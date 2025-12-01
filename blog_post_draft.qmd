@@ -1,0 +1,51 @@
+---
+title: "Assessing Sea Otter Feeding Habitats Based on Prey Type and Dive Depth"
+format: html
+---
+
+## Assessing Sea Otter Feeding Habitats Based on Prey Type and
+
+## Dive Depth
+
+### **Question and data**
+
+How do prey type and dive depth predict the proportion of prey not eaten? (beta model)
+
+-   The blog post provides context and background for the question
+
+-   The data are explained using text and figures
+
+-   The relationships and causal relationships are described with a DAG
+
+Data Exploration
+
+```{r}
+#| output: false
+library(here)
+library(tidyverse)
+forage <- read_csv("forage_final.csv")
+```
+
+### **Statistical model**
+
+-   The statistical model is explained conceptually and using formal statistical notation
+
+-   The blog post demonstrates how to simulate data according to model assumptions
+
+-   The blog post demonstrates that a model fit to the simulated data recovers the parameters
+
+### **Inference**
+
+-   Hypotheses are stated in plain language and with visualizations
+
+-   Model estimates are presented with appropriate uncertainty (e.g., confidence intervals)
+
+-   A hypothesis is tested and the evidence is interpreted
+
+### **Professionalism**
+
+-   The overall appearance of the blog post (e.g., figures, code outputs) is portfolio-quality
+
+-   The writing is comprehensible to a technical audience
+
+-   The code is well-organized and appropriately documented

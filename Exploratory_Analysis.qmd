@@ -1,0 +1,62 @@
+---
+title: "Exploratory_Analysis"
+format: html
+---
+
+## Research Question
+
+The purpose of this document is to perform an explanatory analysis of the dataset for the following research question: How do prey type and dive depth influence the handling time of sea otters during foraging? - Prey category and the diving time (a substitute for dive depth) of sea otters recorded in Prince of Whales, Alaska, are predictors of prey handling time.
+
+Addition 2. How do prey type and dive depth predict the proportion of prey not eaten?
+
+## Loading and Exploring
+
+```{r}
+#| output: false
+library(here)
+library(tidyverse)
+forage <- read_csv("forage_final.csv")
+```
+
+```{r}
+# forage structure
+str(forage)
+
+## drop NAs
+colSums(is.na(forage))
+
+## select for just prey category, diving time, and prey handling time 
+forage <- forage %>% select(BoutID, PreyCat, PreyItem, DT, HT,PropNotEat)
+forage <- forage %>% drop_na()
+
+# Check the structure
+colSums(is.na(forage))
+str(forage)
+```
+
+## Question 1: How do prey type and dive depth influence the handling time of sea otters during foraging?
+
+```{r}
+# Create a scatterplot relating diving time to handling time based on prey item
+forage %>%  ggplot(aes(x = DT, y = HT)) + geom_point() + theme_bw() + labs(x = "Diving Time (seconds)", y = "Handling Time", title = "Prey Handling Time in Sea Otters Based on Diving Time") 
+
+
+forage %>%  ggplot(aes(x = DT, y = HT, col = PreyCat)) + geom_point() + theme_bw() + 
+  facet_wrap(~PreyCat, scales = "free") + labs(x = "Diving Time (seconds)", y = "Handling Time", 
+                                               title = "Prey Handling Time in Sea Otters Based on Diving Time and Prey Category") + theme(legend.position = "none") +
+  scale_color_discrete(palette = "Set2")
+
+```
+
+## Question 2: How do prey category and dive depth predict the proportion of prey not eaten?
+
+```{r}
+# Create a scatterplot of dive time related to the proportion of prey not eaten based on prey category
+forage %>% ggplot(aes(x = DT, y = PropNotEat, col = PreyCat))+ geom_jitter() + theme_bw() + scale_color_discrete(palette = "Set2") + facet_wrap(~PreyCat, scale = "free") + theme(legend.position = "none") + labs(x = "Diving Time (seconds)", y = "Proportion of Prey Not Eaten", 
+                                               title = "Proportion of Prey Not Consumed By Sea Otters Based on Diving Time and Prey Category") + theme(plot.title = element_text(size = 11, face = "bold"))
+
+# Create boxplots to visualize the distribution of Prey categories and proportion of prey not eaten
+forage %>% ggplot(aes(x = PreyCat, y = PropNotEat, fill = PreyCat)) + geom_boxplot() + theme_bw()
+
+
+```
