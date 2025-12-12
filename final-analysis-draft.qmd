@@ -7,7 +7,7 @@ format: html
 
 ## Purpose
 
-The sea otter (*Enhydra lutris*) is a highly social marine mammal that plays a vital role as a keystone species in maintaining the health of kelp forest ecosystems by controlling sea urchin populations. Although sea otters are primary predators of sea urchins, their diet is diverse and includes a wide variety of prey types. For example, sea otters in Alaska are known to consume a wide range of prey, including clams, crabs, sea urchins, sea cucumbers, and snails (LaRoche et al., 2018). In recolonized areas of Southeast Alaska, clams are strongly selected despite their relatively low abundance, reflecting their high quality value. Similarly, sea urchins dominate diets primarily in rocky reef habitats where they are more abundant (LaRoche et al., 2018).
+The sea otter (*Enhydra lutris*) is a highly social marine mammal that plays a vital role as a keystone species in maintaining the health of kelp forest ecosystems by controlling sea urchin populations. Although sea otters are primary predators of sea urchins, their diet is diverse and includes a wide variety of prey types. For example, sea otters in Alaska are known to consume a wide range of prey, including clams, crabs, sea urchins, sea cucumbers, and snails (LaRoche et al., 2023). In recolonized areas of Southeast Alaska, clams are strongly selected despite their relatively low abundance, reflecting their high quality value. Similarly, sea urchins dominate diets primarily in rocky reef habitats where they are more abundant (LaRoche et al., 2023).
 
 ![](images/clipboard-1982355787.png)
 
@@ -68,7 +68,7 @@ plot(dag) # Visualize DAG
 
 ### Data Access
 
-The data used in this project were obtained from the [KNB Data Repository](https://knb.ecoinformatics.org/view/doi%3A10.5063%2FF1C53J8X) and are based on the finalized foraging dataset "Sea otter foraging data, visual observations from Prince of Wales, Alaska*”* compiled by Nicole LaRoche, Sydney King, and Heidi Pearson (2018). LaRoche et al. documented sea otter diets from May to August 2018 using visual observations conducted along the western coast of Prince of Wales Island, Alaska, at sites characterized by high otter densities. The finalized foraging dataset is publicly accessible as a CSV file through the KNB Data Repository.
+The data used in this project were obtained from the [KNB Data Repository](https://knb.ecoinformatics.org/view/doi%3A10.5063%2FF1C53J8X) and are based on the finalized foraging dataset "Sea otter foraging data, visual observations from Prince of Wales, Alaska*”* compiled by Nicole LaRoche, Sydney King, and Heidi Pearson (2022). LaRoche et al. documented sea otter diets from May to August 2018 using visual observations conducted along the western coast of Prince of Wales Island, Alaska, at sites characterized by high otter densities. The finalized foraging dataset is publicly accessible as a CSV file through the KNB Data Repository.
 
 ### Data Importation, Exploration, and Processing
 
@@ -97,14 +97,12 @@ set.seed(123) # For reproducibility
 forage <- read_csv("forage_final.csv")
 ```
 
-Missing values (NAs) were removed prior to analysis. I then selected only the variables required for modeling: prey category (`PreyCat`), dive time (`DT`), and proportion not eaten (`PropNotEat`). Column names were also updated for clarity. Additionally, I generated a summary table showing the number of observations within each prey category and verified that all `NAs` had been removed from the selected variables using `colSums()` in combination with `is.na()`.
+Missing values (NAs) were removed prior to analysis. I then selected only the variables required for modeling: prey category (`PreyCat`), dive time (`DT`), and proportion not eaten (`PropNotEat`). Additionally, I generated a summary table showing the number of observations within each prey category and verified that all `NAs` had been removed from the selected variables using `colSums()` in combination with `is.na()`.
 
 ```{r}
 # Select for just prey category and diving time
 forage <- forage %>% select(PreyCat, PropNotEat, DT)
-#forage <- forage %>% filter(age != "U")
 forage <- forage %>% drop_na() 
-#forage <- forage %>% filter(PreyCat != "PreyCatMussel", PreyCat != "PreyCatSnail")
 table(forage$PreyCat)
 ```
 
@@ -122,14 +120,18 @@ Visualizing the initial data distribution was also helpful. I opted to use a sca
 forage %>% ggplot(aes(x = DT, y = PropNotEat, col = PreyCat)) + 
   geom_jitter()  +
   theme_bw() +
-  scale_color_discrete(palette = "Set2") + 
   labs(x = "Diving Time (seconds)", 
        y = "Proportion of Prey Not Eaten", 
        title = "Proportion of Prey Not Consumed By Sea Otters Based on Diving Time and /nPrey Category") + 
   theme(plot.title = element_text(size = 11, face = "bold"))
 
 # Create boxplots to visualize the distribution of prey categories and proportion of prey not eaten
-forage %>% ggplot(aes(x = PreyCat, y = PropNotEat, fill = PreyCat)) + geom_boxplot() +
+forage %>% ggplot(aes(x = PreyCat, y = PropNotEat, fill = PreyCat)) + geom_boxplot() + 
+  labs(
+    title = "Proportion of Prey Not Consumed By Sea Otters Based on Prey Category", 
+    x = "Prey Category", 
+    y = "Proportion of Prey Not Consumed"
+  ) +
   scale_fill_manual(values = c(
     "Clam" = "#1b9e77",
     "Urchin" = "#d95f02",
@@ -285,9 +287,12 @@ logit(\mu_i)
 + \beta_{PreyCat\_cucumber} 
 + \beta_{PreyCat\_star}  $$
 
-###Hypothesis Testing Interpretation Here, I interpreted the model results to assess whether each hypothesis is supported.
+#### Hypothesis Testing Interpretation 
+
+The beta regression results were used to test whether prey category and dive time influence the proportion of prey left uneaten. Here, I interpreted the model results to assess whether each hypothesis is supported.
 
 ```{r}
+#| code-fold: true
 # Create cleaned summary output table
 tidy(forage_beta) %>% 
   mutate(
@@ -301,42 +306,53 @@ tidy(forage_beta) %>%
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 ```
 
-#### Hypothesis 1 
+#### Hypothesis 1
 
-Based on the model, the coefficient for urchins compared to clams was not statistically significant, and as a result, we fail to reject the null hypothesis that sea otters leave the same proportion of urchins
+-   H~0~: β~PreyCat_urchins~ = 0.
 
--   **Hypothesis 1:**
+-   H~A~: β~PreyCat_urchins~ ≠ 0.
 
-    -   H~0~: β~PreyCat_urchins~ = 0. Sea otters leave the same proportion of urchins uneaten as they do with clams; prey category does not influence the proportion of prey eaten.
+Based on the model, the coefficient for urchins compared to clams was not significant, indicating that sea otters do not leave a significantly different proportion of urchins uneaten (β = -0.21, p = 0.54). Thus, we fail to reject the null hypothesis that sea otters leave the same proportion of urchins uneaten as they do with clams; prey category does not appear to affect the proportion of prey left uneaten for urchins.
 
-    -   H~A~: β~PreyCat_urchins~ ≠ 0. Sea otters leave a significantly different proportion of urchins uneaten compared to clams; prey category has a significant effect on the proportion of prey not eaten.
+#### Hypothesis 2
 
--   **Hypothesis 2**:
+-   H~0~: β~dive_time~ = 0.
 
-    -   H~0~: β~dive_time~ = 0. Dive time has no significant effect on the proportion of prey not eaten; the duration of a dive does not influence how much prey is not eaten.
+-   H~A~: β~dive_time~ ≠ 0.
 
-    -   H~A~: β~dive_time~ ≠ 0. Dive time does significantly affect the proportion of prey not eaten; longer or shorter dives are associated with a higher or lower proportion of prey left uneaten.
+Based on the model, dive time had a significant negative effect on the proportion of prey not eaten, indicating that longer dives are associated with a slightly lower proportion of prey left uneaten (β = -0.005, p = 0.0006). As a result, we can reject the null hypothesis that the duration of a dive has no significant effect on the prey not consumed; there is sufficient statistical evidence to suggest that dive duration significantly influences the proportion of prey not consumed.
+
+## Confidence Intervals for Model Coefficients and Predictions
+
+Confidence intervals are essential for interpreting model estimates because they can be used to quantify uncertainty and interpret effect size. Confidence intervals can be calculated for individual model coefficients, indicating the range in which the true beta value is expected to fall approximately 95% of the time. Alternatively, confidence intervals can be constructed for predicted values of the response variable, showing the range in which the mean response is expected to fall about 95% of the time.
 
 ### **Interpreting Model β Confidence Intervals**
 
+I derived confidence intervals from the fitted model `forage_beta` using `confint()`. Note that these intervals are on the link scale, so they are not directly interpretable as proportions without transforming from the logit scale.
+
 ```{r}
-# Recall that 
+#| code-fold: true
+# Recall that still in link space
 ci_forage <- confint(forage_beta)
 
 # Style with kableExtra
-ci_forage %>% 
-  kable() %>%
+round(ci_forage,2) %>% 
+  kable() %>% 
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
-
-## Calculate with standard equation 
-
 ```
+
+The confidence interval for dive time is negative, indicating that longer dives are potentially associated with a slightly lower proportion of prey left uneaten. The confidence interval for `PreyCatCucumber` is negative and does not include zero, indicating that sea cucumbers are left uneaten significantly less often than clams (reference prey category).
+
+The confidence intervals for `PreyCatCrab`, `PreyCatStar`, and `PreyCatUrchin` all include zero, indicating that the proportion of these prey categories left uneaten are not significant different from clams. Overall, the confidence intervals of each predictor align with the p values from the beta regression model output; significant effects are reflected by the intervals that do not include zero, while the nonsignificant effects have intervals than include zero.
 
 ### Interpreting Confidence Intervals of Predicted Outcomes
 
-```{r}
-## CIs are currently in logit... switch to response scale 
+The uncertainty in the proportion of urchins and clams left uneaten was of interest and can be visualized using a ribbon graph among predicted lines from the model.
 
+I created a prediction grid to explore how dive time (`DT`) and prey category (`PreyCat`) influence the proportion of prey left uneaten by sea otters (`PropNotEat_adj`). I generated a sequence of 100 evenly time-spaced dive times, then combined these with all levels of `PreyCat`. I then ensured that the `PreyCat` factor levels in the prediction grid matched those in the original dataset.
+
+```{r}
+#| code-fold: true
 # Build prediction grid of all combinations of DT and PreyCat 
 predicted_data <- expand.grid(
   # Establish sequence for predictor range (DT)
@@ -349,8 +365,11 @@ predicted_data$PreyCat <- factor(predicted_data$PreyCat, levels = levels(factor(
 
 ```
 
+I utilized `forage_beta` to generate predictions on the logit link scale for each combination of dive time and prey category in the prediction grid. I also calculated the standard errors of these predictions. I then used the predicted values and their standard errors to compute 95% confidence intervals on the link scale by adding and subtracting 1.96 times the standard error from the predicted values to obtain the lower and upper bounds.
+
 ```{r}
-# Predict on logit link scale with SEs
+#| code-fold: true
+# Predict on logit link scale with standard errors
 pred_link <- predict(
   forage_beta,
   newdata = predicted_data,
@@ -359,24 +378,30 @@ pred_link <- predict(
 )
 
 # Predict on logit link scale with standard errors
-predicted_data$fit    <- pred_link$fit
+predicted_data$fit <- pred_link$fit
 predicted_data$se.fit <- pred_link$se.fit
 
-# CIs on link scale
+# Calculate CIs on link scale for lower and upper bounds
 predicted_data$lower_link <- predicted_data$fit - 1.96 * predicted_data$se.fit
-predicted_data$upper_link <- predicted_data$fit + 1.96 * predicted_data$se.fit
 
+predicted_data$upper_link <- predicted_data$fit + 1.96 * predicted_data$se.fit
+```
+
+It was necessary to revert the predicted values and confidence intervals from the logit link scale back to the response scale, so I created an inverse logit function to perform this transformation. I then calculated the predicted proportions as well as the lower and upper bounds of the 95% confidence intervals using the inverse logit function `inv_logit`. Finally, I filtered the prediction grid to focus only on the prey categories of interest, clams and urchins, for data visualization.
+
+```{r}
+#| code-fold: true
 # Revert to response scale usinng inverse logit
 inv_logit <- function(x) 1 / (1 + exp(-x))
-#
+
+# Run inverse function on lower and upper bounds, as well as predicted adjusted prop uneaten
 predicted_data$predicted_PropNotEat_adj <- inv_logit(predicted_data$fit)
 predicted_data$lower <- inv_logit(predicted_data$lower_link)
 predicted_data$upper <- inv_logit(predicted_data$upper_link)
 
-# Select only categories you want to plot
+# Select only categories to plot 
 predicted_ribbon <- predicted_data %>%
   filter(PreyCat %in% c("Clam", "Urchin"))
-
 ```
 
 ```{r}
@@ -391,13 +416,30 @@ predicted_data %>%
     title = "Effect of Dive Time on Predicted Proportion Not Eaten Based on Prey Category",
     x = "Dive Time (seconds)",
     y = "Predicted Proportion Not Eaten"
-  ) + facet_wrap(~ PreyCat) +
+  ) + 
   theme_minimal() +
   scale_color_brewer(palette = "Set1")
 
+
+
+
+# Plot fitted lines per prey category (faceted view)
+predicted_data %>% 
+  ggplot(aes(x = DT, y = predicted_PropNotEat_adj, color = PreyCat)) +
+  geom_line(size = 1) + 
+  labs(
+    title = "Effect of Dive Time on Predicted Proportion Not Eaten Based on Prey Category",
+    x = "Dive Time (seconds)",
+    y = "Predicted Proportion Not Eaten"
+  ) + facet_wrap(~ PreyCat) +
+  theme_minimal() +
+  scale_color_brewer(palette = "Set1")
 ```
 
+With a faceted view, it is observable that as dive time increases, the proportion of prey left uneaten generally decreases for all prey types. Clams consistently have the highest predicted proportion left uneaten across dive times, while sea cucumbers show the lowest. Starfish and urchins also have similar predicted proportions, being slightly lower than clams but higher than sea cucumbers.
+
 ```{r}
+#| code-fold: true
 ## Ribbon
 predicted_data %>% filter(PreyCat %in% c("Clam", "Urchin")) %>%
 ggplot(aes(x = DT, y = predicted_PropNotEat_adj, color = PreyCat)) +
@@ -420,4 +462,26 @@ ggplot(aes(x = DT, y = predicted_PropNotEat_adj, color = PreyCat)) +
   scale_fill_brewer(palette = "Set1")
 ```
 
-For future analysis, the age (adult and juvenile) of observed sea otters may be considered as a potential confounding variable impacting diving time, preference for prey, and the proportion of prey left uneaten.
+The predicted proportion of prey left uneaten for clams and urchins across dive times is visualized above, including 95% confidence intervals for predicted outcomes. As dive time increases, the proportion of prey left uneaten decreases for both prey types. Clams have a higher predicted proportion left uneaten than urchins across the range of five times. Additionally the ribbons illustrate the uncertainty around these predictions, with urchins indicating a wider confidence interval and potentially more variability in predicted values compared to clams.
+
+At approximately the halfway point of 125 seconds of diving, it can be stated with 95% confidence that sea otters leave about 57% of a clam uneaten on average, compared to 49% of an urchin. This suggests that sea otters may expend more energy processing sea urchins than clams, and as a result, they may leave less uneaten when spending more time diving.
+
+## Conclusion
+
+The purpose of this analysis was to demonstrate how a statistical model, specifically beta regression, can be used to perform meaningful analyses, including hypothesis testing and interpreting confidence intervals. The analysis indicates that sea otters tend to leave more of their prey uneaten as dive time increases, reflecting the statistically significant effect of dive duration on the proportion of prey not consumed. Prey category does not appear to influence the proportion of urchins left uneaten. However, sea otters are generally more wasteful with sea cucumbers than with clams, suggesting that clams are a highly valued prey item. Interestingly, sea otters leave a higher proportion of clams uneaten than urchins as dive time increases. For example, at around 125 seconds of diving, it is estimated with 95% confidence that about 57% of a clam remains uneaten on average, compared to 49% of an urchin.
+
+For future analysis, the age (adult and juvenile) of observed sea otters may be considered as a potential confounding variable impacting diving time, preference for prey, and the proportion of prey left uneaten. Including age could be beneficial to clarify whether observed patterns in prey consumption are consistent across different life stages of if younger and older otters exhibit distinct foraging behaviors. Moreover, experience and physical capability could be accounted for in terms of impacts on feeding efficiency.
+
+## References
+
+Cribari-Neto, F. (n.d.). *Beta regression in R*. Retrieved December 11, 2025, from https://cran.r-project.org/web/packages/betareg/vignettes/betareg.html
+
+LaRoche, N., King, S., & Pearson, H. (2020). *Sea otter foraging data, visual observations from Prince of Wales, Alaska*. \[Dataset\]. Knowledge Network for Biocomplexity. Retrieved October 5, 2025, from
+
+<https://knb.ecoinformatics.org/view/doi%3A10.5063%2FF1C53J8X> 
+
+LaRoche, N., King, S., Fergusson, E., Eckert, G., & Pearson, H. (2023). *Sea otter diet nutrient composition with respect to recolonization, life history, and season in southern Southeast Alaska*. Wiley. <https://doi.org/10.22541/au.167222186.60136269/v1>
+
+*R: The beta distribution in regression parameterization*. (n.d.). Retrieved December 11, 2025, from https://search.r-project.org/CRAN/refmans/betareg/html/dbetar.html?utm_source
+
+Smithson, M., & Verkuilen, J. (2006). *A better lemon squeezer? Maximum-likelihood regression with beta-distributed dependent variables*. *Psychological Methods*, *11*(1), 54–71. https://doi.org/10.1037/1082-989x.11.1.54
