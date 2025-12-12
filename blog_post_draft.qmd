@@ -145,7 +145,7 @@ From the scatterplot, it appears that sea otters spending roughly 25-100 seconds
 
 Before building a model using real world data, it is important to simulate data to ensure that the model performs as expected. In this case, I generated simulated data to evaluate model performance, assess parameter recovery, and verify that the fitted model behaves appropriately.
 
-According to the `betareg` CRAN project, a variable cannot take exact values of 0 or 1. Therefore, a zero-adjustment is needed to slightly decrease values of 1 to just below 1 and slightly increase values of 0 to just above 0. In this analysis, I applied the zero-adjustment formula from the `betareg` vignette: $y_{\text{adj}} = \frac{y \cdot (n - 1) + 0.5}{n}$, where n is the sample size (Smithson and Verkuilen, 2006).
+According to the `betareg` CRAN project, a variable cannot take exact values of 0 or 1. Therefore, a zero-adjustment is required to slightly decrease values of 1 to just below 1 and slightly increase values of 0 to just above 0. To adjust the response variable `PropNotEat` to the corrected range, I applied the zero-adjustment formula from the `betareg` vignette : $y_{\text{adj}} = \frac{y \cdot (n - 1) + 0.5}{n}$, where *n* is the sample size (Smithson and Verkuilen, 2006).
 
 ```{r}
 # Beta does not take direct 0 and 1, so do adjustment to offset before 1 and after 0
@@ -251,6 +251,7 @@ sim_model <- glmmTMB(
 ```
 
 ```{r}
+#| code-fold: true
 # Compare coefficients
 # Create tidy table with broom package
 sim_tidy <- tidy(sim_model) %>% 
@@ -267,9 +268,11 @@ coef_comparison <- bind_rows(sim_tidy, original_tidy)
 coef_comparison
 ```
 
+Here, it is observable that the coefficients for each predictor in the simulated model closely match those from the original model fitted to the real data. This indicates that the beta regression is able to reliably recover the underlying parameter relationships.
+
 ## Inference and Hypothesis Testing with Beta Regression
 
-Recall the definition of the beta distribution used in the model:
+Beta regression was specifically chosen for this analysis because the response variable, `PropNotEat_adj`, is proportional. Recall the definition of the beta distribution used in the model:
 
 $$
 \text{PropNotEaten} \sim \text{Beta}(\alpha, \beta)
@@ -279,29 +282,57 @@ logit(\mu_i)
 + \beta_{diveTime} 
 + \beta_{PreyCat\_urchin} 
 + \beta_{PreyCat\_crab} 
-+ \beta_{PreCat\_cucumber} 
-+ \beta_{PreCat\_star}  
-$$
++ \beta_{PreyCat\_cucumber} 
++ \beta_{PreyCat\_star}  $$
+
+###Hypothesis Testing Interpretation Here, I interpreted the model results to assess whether each hypothesis is supported.
 
 ```{r}
-
+# Create cleaned summary output table
+tidy(forage_beta) %>% 
+  mutate(
+    estimate  = round(estimate, 2),
+    std.error = round(std.error, 2),
+    statistic = round(statistic, 2),
+    p.value = round(p.value, 3)    
+  ) %>%
+  select(term, estimate, std.error, statistic, p.value) %>%
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 ```
 
-### Beta CIs
+#### Hypothesis 1 
+
+Based on the model, the coefficient for urchins compared to clams was not statistically significant, and as a result, we fail to reject the null hypothesis that sea otters leave the same proportion of urchins
+
+-   **Hypothesis 1:**
+
+    -   H~0~: β~PreyCat_urchins~ = 0. Sea otters leave the same proportion of urchins uneaten as they do with clams; prey category does not influence the proportion of prey eaten.
+
+    -   H~A~: β~PreyCat_urchins~ ≠ 0. Sea otters leave a significantly different proportion of urchins uneaten compared to clams; prey category has a significant effect on the proportion of prey not eaten.
+
+-   **Hypothesis 2**:
+
+    -   H~0~: β~dive_time~ = 0. Dive time has no significant effect on the proportion of prey not eaten; the duration of a dive does not influence how much prey is not eaten.
+
+    -   H~A~: β~dive_time~ ≠ 0. Dive time does significantly affect the proportion of prey not eaten; longer or shorter dives are associated with a higher or lower proportion of prey left uneaten.
+
+### **Interpreting Model β Confidence Intervals**
 
 ```{r}
-## upper lower bounds?? 
-## Coef CI?? 
-## Bootstrap
+# Recall that 
 ci_forage <- confint(forage_beta)
-print(ci_forage)
+
+# Style with kableExtra
+ci_forage %>% 
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 
 ## Calculate with standard equation 
-beta1_model <- -0.004949 
-lwr = beta1_model - (1.96*0.001488 )
-upr = beta1_model + (1.96*0.001488 )
-print(paste(lwr, upr))
+
 ```
+
+### Interpreting Confidence Intervals of Predicted Outcomes
 
 ```{r}
 ## CIs are currently in logit... switch to response scale 
@@ -387,8 +418,6 @@ ggplot(aes(x = DT, y = predicted_PropNotEat_adj, color = PreyCat)) +
   theme_minimal() + 
   scale_color_brewer(palette = "Set1") +
   scale_fill_brewer(palette = "Set1")
-
-
 ```
 
 For future analysis, the age (adult and juvenile) of observed sea otters may be considered as a potential confounding variable impacting diving time, preference for prey, and the proportion of prey left uneaten.
