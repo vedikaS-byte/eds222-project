@@ -143,18 +143,21 @@ From the scatterplot, it appears that sea otters spending roughly 25-100 seconds
 
 ### Data Simulation Procedure
 
-Prior to constructing a model based on real world data, it is important to simulate data to confirm that the
+Before building a model using real world data, it is important to simulate data to ensure that the model performs as expected. In this case, I generated simulated data to evaluate model performance, assess parameter recovery, and verify that the fitted model behaves appropriately.
 
-Here, I simulated data was generated to evaluate model performance, explore parameter recovery, and verify that the fitted model behaves as expected. As cited in the `betareg` CRAN project, the
+According to the `betareg` CRAN project, a variable cannot take exact values of 0 or 1. Therefore, a zero-adjustment is needed to slightly decrease values of 1 to just below 1 and slightly increase values of 0 to just above 0. In this analysis, I applied the zero-adjustment formula from the `betareg` vignette: $y_{\text{adj}} = \frac{y \cdot (n - 1) + 0.5}{n}$, where n is the sample size (Smithson and Verkuilen, 2006).
 
 ```{r}
-# Beta does not take direct 0 and 1! need to do adjustment to offset before 1 and after 0 ()
+# Beta does not take direct 0 and 1, so do adjustment to offset before 1 and after 0
 forage <- forage %>%
   mutate(PropNotEat_adj = # Transformation to adjust (betareg cranr)
            (PropNotEat * (nrow(.) - 1) + 0.5) / nrow(.))
 ```
 
+I was particularly interested in whether an interaction existed between dive time and prey category. To determine the most appropriate model, I fitted each candidate model using `glmmTMB()` with a `beta_family()` and logit link. I then compared models using Akaike’s Information Criterion (AIC) to identify the lowest score. The model `PropNotEat_adj ~ DT + PreyCat` had the lowest (most negative) AIC, indicating the best balance between fit and simplicity. Therefore, this model was selected for further analysis.
+
 ```{r}
+#| code-fold: true
 # Original model
 forage_beta <- glmmTMB(
   PropNotEat_adj ~ DT + PreyCat,
@@ -169,12 +172,17 @@ forage_interaction <- forage_org <- glmmTMB(
   data = forage,
   family = beta_family(link = "logit")
 )
+```
 
+```{r}
 # Compare models (lowest AIC) (Akaike's An Information Criterion for log-link)
 AIC(forage_beta, forage_interaction)
 ```
 
+To assess model performance and parameter recovery, I simulated 15,000 observations based on the original model coefficients. Dive time (DT) was drawn from a uniform distribution, and prey category (PreyCat) was randomly assigned.
+
 ```{r}
+#| code-fold: true
 # Reset seed (redefined)
 set.seed(123)
 
@@ -204,9 +212,16 @@ prey_effect <- ifelse(PreyCat == "Crab", beta_crab,
                ifelse(PreyCat == "Urchin", beta_urchin, 
                0)))) # Else assign clam (reference)
 
+
+```
+
+A linear predictor combining dive time and prey effects was calculated on the logit scale and transformed to the response scale. Each observation was then reparameterized into `alpha` and `beta` parameters (derived from the `betareg` CRAN project) for the beta distribution using the mean and precision. `PropNotEat_adj` values were simulated accordingly using `rbeta()`.
+
+```{r}
+#| code-fold: true
 glm_eq <- beta0 + beta_dive_time * dt + prey_effect # Recall that prey_effect has the associated beta coefficient for each level
 
-# Convert linear predictor (logit scale) to  mean proportion on  response scale
+# Convert linear predictor (logit scale) to  mean proportion on response scale
 mean_sim <- exp(glm_eq) / (1 + exp(glm_eq))
 
 # Reparameterize beta distribution parameters (derived from CRAN at (https://search.r-project.org/CRAN/refmans/betareg/html/dbetar.html)
@@ -215,7 +230,11 @@ beta <- (1 - mean_sim) * phi
 
 # Simulate response variable from beta distribution using calculated alpha and beta 
 PropNotEat_adj <- rbeta(n_sim, alpha, beta)
+```
 
+The resulting dataset was fitted with `glmmTMB()` using a beta family and logit link to verify that the model could recover the original relationships.
+
+```{r}
 # Create simulated data frame
 simulated_forage <- data.frame(
   PropNotEat_adj = PropNotEat_adj,
@@ -233,11 +252,24 @@ sim_model <- glmmTMB(
 
 ```{r}
 # Compare coefficients
-summary(sim_model)
-summary(forage_beta)
+# Create tidy table with broom package
+sim_tidy <- tidy(sim_model) %>% 
+  mutate(model = "Simulated")  # Add column to identify model
+
+# Create tidy table for original model coefficients
+original_tidy <- tidy(forage_beta) %>% 
+  mutate(model = "Original")  # Add column to identify model
+
+# Combine into table for comparison
+coef_comparison <- bind_rows(sim_tidy, original_tidy)
+
+# View table
+coef_comparison
 ```
 
-### **Statistical Hypothesis Test and Inference**
+## Inference and Hypothesis Testing with Beta Regression
+
+Recall the definition of the beta distribution used in the model:
 
 $$
 \text{PropNotEaten} \sim \text{Beta}(\alpha, \beta)
@@ -249,9 +281,11 @@ logit(\mu_i)
 + \beta_{PreyCat\_crab} 
 + \beta_{PreCat\_cucumber} 
 + \beta_{PreCat\_star}  
-$$ - Model estimates are presented with appropriate uncertainty (e.g., confidence intervals)
+$$
 
-\[Extracting CIs via bootstrapping: Accompanying uncertainty estimates \]
+```{r}
+
+```
 
 ### Beta CIs
 
