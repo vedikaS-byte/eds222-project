@@ -1,1 +1,2 @@
-# eds222-project
+# Assessing Sea Otter Feeding Habitats Based on Prey Type and Dive Depth
+This repository houses all the data, code, and analysis for the EDS 222 Final Project, as part of the Master of Environmental Data Science at the Bren School of Environmental Science and Management, UC Santa Barbara. 
