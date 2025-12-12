@@ -83,7 +83,6 @@ Here, I loaded the necessary packages for the analysis and then imported the dat
 #| warning: false
 library(here) 
 library(tidyverse)
-# https://cran.r-project.org/web/packages/betareg/vignettes/betareg.html#sec-model
 library(glmmTMB)
 library(broom)         
 library(broom.mixed) # for glmmTMB mixed model
@@ -267,7 +266,10 @@ original_tidy <- tidy(forage_beta) %>%
 coef_comparison <- bind_rows(sim_tidy, original_tidy)
 
 # View table
-coef_comparison
+coef_comparison %>% 
+  select(term, estimate, std.error, model) %>% 
+  kable()   %>%
+  kable_styling()
 ```
 
 Here, it is observable that the coefficients for each predictor in the simulated model closely match those from the original model fitted to the real data. This indicates that the beta regression is able to reliably recover the underlying parameter relationships.
