@@ -7,7 +7,7 @@ format: html
 
 *Currently under construction: Some sections do not have descriptions and will be updated by this Saturday.*
 
-### **Purpose**
+## Purpose
 
 The sea otter (*Enhydra lutris*) is a highly social marine mammal that plays a vital role as a keystone species in maintaining the health of kelp forest ecosystems by controlling sea urchin populations. Although sea otters are primary predators of sea urchins, their diet is diverse and includes a wide variety of prey types. For example, sea otters in Alaska are known to consume a wide range of prey, including clams, crabs, sea urchins, sea cucumbers, and snails (LaRoche et al., 2018). In recolonized areas of Southeast Alaska, clams are strongly selected despite their relatively low abundance, reflecting their high quality value. Similarly, sea urchins dominate diets primarily in rocky reef habitats where they are more abundant (LaRoche et al., 2018).
 
@@ -39,13 +39,13 @@ $$
 
     -   H~0~: β~PreyCat_urchins~ = 0. Sea otters leave the same proportion of urchins uneaten as they do with clams; prey category does not influence the proportion of prey eaten.
 
-    -   HA: β~PreyCat_urchins~ ≠ 0. Sea otters leave a significantly different proportion of urchins uneaten compared to clams; prey category has a significant effect on the proportion of prey not eaten.
+    -   H~A~: β~PreyCat_urchins~ ≠ 0. Sea otters leave a significantly different proportion of urchins uneaten compared to clams; prey category has a significant effect on the proportion of prey not eaten.
 
 -   **Hypothesis 2**:
 
-    -   H0: β~dive_time~ = 0. Dive time has no significant effect on the proportion of prey not eaten; the duration of a dive does not influence how much prey is not eaten.
+    -   H~0~: β~dive_time~ = 0. Dive time has no significant effect on the proportion of prey not eaten; the duration of a dive does not influence how much prey is not eaten.
 
-    -   HA: β~dive_time~ ≠ 0. Dive time does significantly affect the proportion of prey not eaten; longer or shorter dives are associated with a higher or lower proportion of prey left uneaten.
+    -   H~A~: β~dive_time~ ≠ 0. Dive time does significantly affect the proportion of prey not eaten; longer or shorter dives are associated with a higher or lower proportion of prey left uneaten.
 
 The categorical variable `PreyCat` represents the general prey categorization of a prey type. In particular, clams and urchins differ biologically in handling difficulty and energetic return. Urchins may require more processing and include defensive structures (spines), whereas clams require shell-breaking but offer concentrated soft tissue. These differences potentially influence the proportion of prey successfully consumed, indicating a direct causal effect of prey category on the proportion of prey not consumed
 
@@ -66,16 +66,24 @@ dag <- dagitty("dag {
 plot(dag) # Visualize DAG
 ```
 
-### Data Importation, Exploration, and Cleaning
+## Data Availability and Characteristics
+
+### Data Access
+
+The data used in this project were obtained from the [KNB Data Repository](https://knb.ecoinformatics.org/view/doi%3A10.5063%2FF1C53J8X) and are based on the finalized foraging dataset "Sea otter foraging data, visual observations from Prince of Wales, Alaska*”* compiled by Nicole LaRoche, Sydney King, and Heidi Pearson (2018). LaRoche et al. documented sea otter diets from May to August 2018 using visual observations conducted along the western coast of Prince of Wales Island, Alaska, at sites characterized by high otter densities. The finalized foraging dataset is publicly accessible as a CSV file through the KNB Data Repository.
+
+### Data Importation, Exploration, and Processing
+
+Here, we want to call the appropriate packages for the analysis.
 
 ```{r}
 #| code-fold: true
 #| code-summary: "Show code"
 #| output: false
 #| warning: false
-library(here)
+library(here) 
 library(tidyverse)
-library(betareg) # https://cran.r-project.org/web/packages/betareg/vignettes/betareg.html#sec-model
+# https://cran.r-project.org/web/packages/betareg/vignettes/betareg.html#sec-model
 library(glmmTMB)
 library(broom)         
 library(broom.mixed) # for glmmTMB mixed model
@@ -224,14 +232,31 @@ summary(forage_beta)
 
 -   Model estimates are presented with appropriate uncertainty (e.g., confidence intervals)
 
-\[Extracting CIs via bootstrapping: Accompanying uncertainty estimates coming soon...\]
+\[Extracting CIs via bootstrapping: Accompanying uncertainty estimates \]
 
-\[Further interpretation coming soon...\]
+### Beta CIs
 
 ```{r}
-# Build prediction grid
+## upper lower bounds?? 
+## Coef CI?? 
+## Bootstrap
+ci_forage <- confint(forage_beta)
+print(ci_forage)
+
+## Calculate with standard equation 
+beta1_model <- -0.004949 
+lwr = beta1_model - (1.96*0.001488 )
+upr = beta1_model + (1.96*0.001488 )
+print(paste(lwr, upr))
+str(forage)
+```
+
+```{r}
+## CIs are currently in logit... switch to response scale 
+
+# Build prediction grid of all combinations of DT and PreyCat 
 predicted_data <- expand.grid(
-  # Establish sequency for predictor range (DT)
+  # Establish sequence for predictor range (DT)
   DT = seq(min(forage$DT, na.rm = TRUE), max(forage$DT, na.rm = TRUE), length.out = 100),
   PreyCat = levels(factor(forage$PreyCat)) # Convert to factor
 )
@@ -239,12 +264,36 @@ predicted_data <- expand.grid(
 # Ensure levels in predicted_data exactly match in forage$PreyCat
 predicted_data$PreyCat <- factor(predicted_data$PreyCat, levels = levels(factor(forage$PreyCat)))
 
-# Predict with glmmTMB()
-predicted_data$predicted_PropNotEaten <- predict(
-  forage_beta, 
+```
+
+```{r}
+# Predict on logit link scale with SEs
+pred_link <- predict(
+  forage_beta,
   newdata = predicted_data,
-  type = "response" 
+  type = "link",
+  se.fit = TRUE
 )
+
+# Predict on logit link scale with standard errors
+predicted_data$fit    <- pred_link$fit
+predicted_data$se.fit <- pred_link$se.fit
+
+# CIs on link scale
+predicted_data$lower_link <- predicted_data$fit - 1.96 * predicted_data$se.fit
+predicted_data$upper_link <- predicted_data$fit + 1.96 * predicted_data$se.fit
+
+# Revert to response scale usinng inverse logit
+inv_logit <- function(x) 1 / (1 + exp(-x))
+#
+predicted_data$predicted_PropNotEat_adj <- inv_logit(predicted_data$fit)
+predicted_data$lower <- inv_logit(predicted_data$lower_link)
+predicted_data$upper <- inv_logit(predicted_data$upper_link)
+
+# Select only categories you want to plot
+predicted_ribbon <- predicted_data %>%
+  filter(PreyCat %in% c("Clam", "Urchin"))
+
 ```
 
 ```{r}
@@ -253,7 +302,7 @@ predicted_data$predicted_PropNotEaten <- predict(
 #| warning: false
 # Plot fitted lines per prey category
 predicted_data %>% 
-  ggplot(aes(x = DT, y = predicted_PropNotEaten, color = PreyCat)) +
+  ggplot(aes(x = DT, y = predicted_PropNotEat_adj, color = PreyCat)) +
   geom_line(size = 1) +
   labs(
     title = "Effect of Dive Time on Predicted Proportion Not Eaten Based on Prey Category",
@@ -262,6 +311,31 @@ predicted_data %>%
   ) +
   theme_minimal() +
   scale_color_brewer(palette = "Set1")
+
+```
+
+```{r}
+## Ribbon
+predicted_data %>% filter(PreyCat %in% c("Clam", "Urchin")) %>%
+ggplot(aes(x = DT, y = predicted_PropNotEat_adj, color = PreyCat)) +
+  # Ribbon for Clam and Urchin
+  geom_ribbon(
+    data = predicted_ribbon,
+    aes(ymin = lower, ymax = upper, fill = PreyCat),
+    alpha = 0.2,
+    color = NA
+  ) +
+  # Predicted lines for all categories
+  geom_line(size = 1) +
+  labs(
+    title = "Effect of Dive Time on Predicted Proportion Not Eaten by Prey Category",
+    x = "Dive Time (seconds)",
+    y = "Predicted Proportion Not Eaten"
+  ) +
+  theme_minimal() + 
+  scale_color_brewer(palette = "Set1") +
+  scale_fill_brewer(palette = "Set1")
+
 
 ```
 
