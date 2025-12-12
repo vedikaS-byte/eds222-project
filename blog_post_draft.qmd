@@ -5,8 +5,6 @@ format: html
 
 # Assessing Sea Otter Feeding Habitats Based on Prey Type and Dive Depth
 
-*Currently under construction: Some sections do not have descriptions and will be updated by this Saturday.*
-
 ## Purpose
 
 The sea otter (*Enhydra lutris*) is a highly social marine mammal that plays a vital role as a keystone species in maintaining the health of kelp forest ecosystems by controlling sea urchin populations. Although sea otters are primary predators of sea urchins, their diet is diverse and includes a wide variety of prey types. For example, sea otters in Alaska are known to consume a wide range of prey, including clams, crabs, sea urchins, sea cucumbers, and snails (LaRoche et al., 2018). In recolonized areas of Southeast Alaska, clams are strongly selected despite their relatively low abundance, reflecting their high quality value. Similarly, sea urchins dominate diets primarily in rocky reef habitats where they are more abundant (LaRoche et al., 2018).
@@ -49,7 +47,7 @@ $$
 
 The categorical variable `PreyCat` represents the general prey categorization of a prey type. In particular, clams and urchins differ biologically in handling difficulty and energetic return. Urchins may require more processing and include defensive structures (spines), whereas clams require shell-breaking but offer concentrated soft tissue. These differences potentially influence the proportion of prey successfully consumed, indicating a direct causal effect of prey category on the proportion of prey not consumed
 
-Additionally, prey category may influence dive duration because hunting, handling, and extracting different prey may require different levels of effort and time. Thus, prey category potentially influences dive time, which in turn affects the proportion of prey not eaten.
+Additionally, prey category may influence dive duration (continuous numeric variable) because hunting, handling, and extracting different prey may require different levels of effort and time. Thus, prey category potentially influences dive time, which in turn affects the proportion of prey not eaten.
 
 ```{r}
 #| code-fold: true
@@ -74,7 +72,9 @@ The data used in this project were obtained from the [KNB Data Repository](https
 
 ### Data Importation, Exploration, and Processing
 
-Here, we want to call the appropriate packages for the analysis.
+The foraging dataset used in this project had been previously cleaned by the original authors. However, additional processing was required, including adjusting variables to appropriate ranges and removing missing values. Therefore, further preprocessing steps were necessary before conducting the analyses.
+
+Here, I loaded the necessary packages for the analysis and then imported the dataset by providing the correct file path to `read_csv()`.
 
 ```{r}
 #| code-fold: true
@@ -91,41 +91,46 @@ library(kableExtra)
 ```
 
 ```{r}
+#| code-fold: true
 #| output: false
-set.seed(123)
+set.seed(123) # For reproducibility
 forage <- read_csv("forage_final.csv")
 ```
 
+Missing values (NAs) were removed prior to analysis. I then selected only the variables required for modeling: prey category (`PreyCat`), dive time (`DT`), and proportion not eaten (`PropNotEat`). Column names were also updated for clarity. Additionally, I generated a summary table showing the number of observations within each prey category and verified that all `NAs` had been removed from the selected variables using `colSums()` in combination with `is.na()`.
+
 ```{r}
-# Inspect first few rows
-head(forage)
+# Select for just prey category and diving time
+forage <- forage %>% select(PreyCat, PropNotEat, DT)
+#forage <- forage %>% filter(age != "U")
+forage <- forage %>% drop_na() 
+#forage <- forage %>% filter(PreyCat != "PreyCatMussel", PreyCat != "PreyCatSnail")
+table(forage$PreyCat)
 ```
 
 ```{r}
-# Drop NAs 
-# Select for just prey category, diving time, and age
-forage <- forage %>% select(PreyCat, PropNotEat, DT, age)
-forage <- forage %>% filter(age != "U") 
-forage <- forage %>% drop_na()
-```
-
-```{r}
-# Check the colSums... were they all dropped?
+# Check the colSums to ensure all NAs are dropped
 colSums(is.na(forage)) 
 ```
+
+Visualizing the initial data distribution was also helpful. I opted to use a scatterplot to show the relationship between dive time (a continuous numeric variable) and the proportion of prey not eaten by prey category, along with a boxplot to display the distribution of uneaten prey within each category.
 
 ```{r}
 #| code-fold: true
 #| code-summary: "Show code"
 # Create a scatterplot of dive time related to the proportion of prey not eaten based on prey category
-forage %>% ggplot(aes(x = DT, y = PropNotEat))+ geom_jitter() + theme_bw() +  #+ scale_color_discrete(palette = "Set2") + 
-#   #facet_wrap(~PreyCat, scale = "free") + 
-  #theme(legend.position = "none") + 
-labs(x = "Diving Time (seconds)", y = "Proportion of Prey Not Eaten", 
-                                               title = "Proportion of Prey Not Consumed By Sea Otters Based on Diving Time") + theme(plot.title = element_text(size = 11, face = "bold"))
+forage %>% ggplot(aes(x = DT, y = PropNotEat, col = PreyCat)) + 
+  geom_jitter()  +
+  theme_bw() +
+  scale_color_discrete(palette = "Set2") + 
+  labs(x = "Diving Time (seconds)", 
+       y = "Proportion of Prey Not Eaten", 
+       title = "Proportion of Prey Not Consumed By Sea Otters Based on Diving Time and /nPrey Category") + 
+  theme(plot.title = element_text(size = 11, face = "bold"))
 
 # Create boxplots to visualize the distribution of prey categories and proportion of prey not eaten
-forage %>% ggplot(aes(x = PreyCat, y = PropNotEat, fill = PreyCat)) + geom_boxplot() + scale_fill_manual(values = c(
+forage %>% ggplot(aes(x = PreyCat, y = PropNotEat, fill = PreyCat)) + geom_boxplot() +
+  scale_fill_manual(values = c(
     "Clam" = "#1b9e77",
     "Urchin" = "#d95f02",
     "Crab" = "#7570b3",
@@ -134,9 +139,13 @@ forage %>% ggplot(aes(x = PreyCat, y = PropNotEat, fill = PreyCat)) + geom_boxpl
   )) + theme_bw()
 ```
 
+From the scatterplot, it appears that sea otters spending roughly 25-100 seconds on prey often leave around 50% or even 100% of clams and crabs uneaten, suggesting potentially wasteful behavior. Most prey left uneaten cluster around 50% for clams, crabs, and sea cucumbers, and between 25-175 seconds for sea urchins. Notably, longer prey handling times, which are associated with deeper dives, are linked to lower proportions of prey left uneaten, typically under 25-50%, especially for clams, urchins, and crabs. The boxplot shows that starfish have a higher median proportion left uneaten than other prey categories, while sea cucumbers have the lowest median. Sea urchins also tend to be left uneaten less often than clams.
+
 ### Data Simulation Procedure
 
-Here, simulated data was generated to evaluate model performance, explore parameter recovery, and verify that the fitted model behaves as expected. As cited in the `betareg` CRAN project, the
+Prior to constructing a model based on real world data, it is important to simulate data to confirm that the
+
+Here, I simulated data was generated to evaluate model performance, explore parameter recovery, and verify that the fitted model behaves as expected. As cited in the `betareg` CRAN project, the
 
 ```{r}
 # Beta does not take direct 0 and 1! need to do adjustment to offset before 1 and after 0 ()
@@ -228,9 +237,19 @@ summary(sim_model)
 summary(forage_beta)
 ```
 
-### **Inference**
+### **Statistical Hypothesis Test and Inference**
 
--   Model estimates are presented with appropriate uncertainty (e.g., confidence intervals)
+$$
+\text{PropNotEaten} \sim \text{Beta}(\alpha, \beta)
+$$$$
+logit(\mu_i)
+= \beta_{0}
++ \beta_{diveTime} 
++ \beta_{PreyCat\_urchin} 
++ \beta_{PreyCat\_crab} 
++ \beta_{PreCat\_cucumber} 
++ \beta_{PreCat\_star}  
+$$ - Model estimates are presented with appropriate uncertainty (e.g., confidence intervals)
 
 \[Extracting CIs via bootstrapping: Accompanying uncertainty estimates \]
 
@@ -248,7 +267,6 @@ beta1_model <- -0.004949
 lwr = beta1_model - (1.96*0.001488 )
 upr = beta1_model + (1.96*0.001488 )
 print(paste(lwr, upr))
-str(forage)
 ```
 
 ```{r}
@@ -303,12 +321,12 @@ predicted_ribbon <- predicted_data %>%
 # Plot fitted lines per prey category
 predicted_data %>% 
   ggplot(aes(x = DT, y = predicted_PropNotEat_adj, color = PreyCat)) +
-  geom_line(size = 1) +
+  geom_line(size = 1) + 
   labs(
     title = "Effect of Dive Time on Predicted Proportion Not Eaten Based on Prey Category",
     x = "Dive Time (seconds)",
     y = "Predicted Proportion Not Eaten"
-  ) +
+  ) + facet_wrap(~ PreyCat) +
   theme_minimal() +
   scale_color_brewer(palette = "Set1")
 
